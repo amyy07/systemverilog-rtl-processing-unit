@@ -4,7 +4,7 @@ A small FSM-controlled processing unit designed and verified in SystemVerilog.
 
 ## Overview
 
-This project implements a simple processing unit that accepts a sequence of 8-bit input values, accumulates them over five clock cycles, and indicates when the final result is ready.
+This project implements a simple processing unit that accepts a sequence of 8-bit input values, accumulates them over five enabled operations, and indicates when the final result is ready.
 
 The design is divided into two main components:
 
@@ -22,7 +22,7 @@ The design is divided into two main components:
                     │
                     ▼
              ┌──────────────┐
- data_in ───►│   Datapath   │───► result
+ data_in ───►│   Datapath  │───► result
              └──────┬───────┘
                     │
                  finished
@@ -30,6 +30,7 @@ The design is divided into two main components:
                     └────────► Control FSM
 
                          done ──► output
+```
 
 ## Design Details
 
@@ -58,10 +59,18 @@ When `enable` is asserted, the datapath performs:
 ```text
 result ← result + data_in
 count  ← count + 1
+```
 
+After five enabled operations:
 
-```markdown
-## FSM
+```text
+count = 5
+finished = 1
+```
+
+This causes the control FSM to transition from `WORKING` to `DONE`.
+
+### FSM
 
 The control unit uses three states:
 
@@ -75,8 +84,17 @@ The FSM follows:
 
 ```text
 IDLE → WORKING → DONE → IDLE
+```
 
-```markdown
+### Reset and Clear
+
+The design uses a synchronous reset.
+
+- `reset` initializes the FSM and datapath.
+- `clear` prepares the datapath for a new calculation without resetting the entire system.
+
+This prevents results and counter state from a previous operation from carrying over into a new operation.
+
 ## Verification
 
 The design was simulated using Icarus Verilog and inspected using GTKWave.
@@ -89,15 +107,16 @@ Test cases include:
 - Verification of the `done` signal
 - Waveform inspection of FSM and datapath signals
 
-Example:
+Example calculations:
 
 ```text
 1 + 3 + 2 + 4 + 6 = 16
 2 + 1 + 5 + 3 + 4 = 15
+```
 
-```markdown
+All test cases passed during simulation.
 
-## Debugging 
+## Debugging
 
 The design was verified using a self-checking SystemVerilog testbench.
 
@@ -105,11 +124,29 @@ During initial simulation, the testbench produced:
 
 ```text
 FAIL: result = 17, done = 0
+```
 
+The issue was traced to clock-cycle timing in the testbench. The first input value was changed before the datapath had an enabled clock edge on which to process it.
+
+The testbench stimulus was corrected so that input values remain stable for the clock cycle in which the datapath processes them.
+
+The corrected simulation passed the verification checks.
+
+Waveforms were also inspected using GTKWave to verify:
+
+- FSM state transitions
+- `enable` and `clear` timing
+- Accumulator updates
+- Operation counter behaviour
+- `finished` and `done` signals
+- Synchronous reset behaviour
+
+This debugging process demonstrated the importance of aligning testbench stimulus with clocked RTL behaviour.
 
 ## Tools
 
 - SystemVerilog
 - Icarus Verilog
 - GTKWave
-- Git/GitHub
+- Git
+- GitHub
